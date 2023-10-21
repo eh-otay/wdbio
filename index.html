@@ -41,14 +41,14 @@
       e.preventDefault();
       if (input.value) {
         const clientOffset = `${socket.id}-${counter++}`;
-        socket.emit('chat message', input.value, clientOffset);
+        socket.emit('chat message', input.value, socket.id, clientOffset);
         input.value = '';
       }
     });
 
-    socket.on('chat message', (msg, serverOffset) => {
+    socket.on('chat message', (msg, clientId, serverOffset) => {
       const item = document.createElement('li');
-      item.textContent = msg;
+      item.textContent = `${clientId}: ${msg}`;
       messages.appendChild(item);
       window.scrollTo(0, document.body.scrollHeight);
       socket.auth.serverOffset = serverOffset;

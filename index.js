@@ -26,6 +26,7 @@ if (cluster.isPrimary) {
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_offset TEXT UNIQUE,
+      client_id TEXT,
       content TEXT
     );
   `);
@@ -42,10 +43,10 @@ if (cluster.isPrimary) {
   });
 
   io.on('connection', async (socket) => {
-    socket.on('chat message', async (msg, clientOffset, callback) => {
+    socket.on('chat message', async (msg, clientId, clientOffset, callback) => {
       let result;
       try {
-        result = await db.run('INSERT INTO messages (content, client_offset) VALUES (?, ?)', msg, clientOffset);
+        result = await db.run('INSERT INTO messages (content, client_id, client_offset) VALUES (?, ?, ?)', msg, clientId, clientOffset);
       } catch (e) {
         if (e.errno === 19 /* SQLITE_CONSTRAINT */ ) {
           callback();
@@ -54,16 +55,16 @@ if (cluster.isPrimary) {
         }
         return;
       }
-      io.emit('chat message', msg, result.lastID);
+      io.emit('chat message', msg, clientId, result.lastID);
       callback();
     });
 
     if (!socket.recovered) {
       try {
-        await db.each('SELECT id, content FROM messages WHERE id > ?',
+        await db.each('SELECT content, client_id, id FROM messages WHERE id > ?',
           [socket.handshake.auth.serverOffset || 0],
           (_err, row) => {
-            socket.emit('chat message', row.content, row.id);
+            socket.emit('chat message', row.content, row.client_id, row.id);
           }
         )
       } catch (e) {
@@ -74,7 +75,8 @@ if (cluster.isPrimary) {
 
   const port = process.env.PORT;
 
-  server.listen(port, () => {
-    console.log(`server running at http://localhost:${port}`);
+  const ip = "192.168.0.180";
+  server.listen(port, ip, () => {
+    console.log(`server running at http://${ip}:${port}`);
   });
 }
